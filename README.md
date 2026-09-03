@@ -19,6 +19,10 @@ npm test        # בדיקות אוטומציה
 
 `GET /api/healthcheck` — בדיקת חיות.
 
+תיעוד אינטראקטיבי של ה-API (Swagger UI): `/api-docs` — מציג את החוזה המלא
+(JSON ו-form-data) וכולל כפתור "Try it out" לשליחת בקשות ישירות מהדפדפן.
+מקור התיעוד הוא `openapi.json`.
+
 ## POST /api/compare
 
 הממשק עובד **אחד-על-אחד**: כל קריאה נושאת שורות טבלה של תעודת זהות אחת +
@@ -89,27 +93,33 @@ Content-Type: application/json
 ```
 app.ts                              # נקודת כניסה
 IController.ts                      # מחלקת בקר בסיס
+openapi.json                        # מקור תיעוד ה-Swagger של POST /api/compare
 src/
-  startApp.ts                       # אתחול אפליקציית Express
+  startApp.ts                       # אתחול אפליקציית Express (כולל /api-docs)
   components/compare/
     compare.controller.ts           # POST /api/compare
     compare.service.ts              # הלוגיקה העסקית: פענוח, השוואה, בניית תשובה
   comparator.ts                     # מנוע ההשוואה
   mappings.ts                       # טבלאות קודים ומיפוי PDF -> DAT
-  tableSource.ts                    # פענוח שורות מהטבלה הזמנית
+  tableSource.ts                    # פענוח שורות JSON מהטבלה הזמנית - מקור הנתונים היחיד של ה-API
   parsers/
-    datParser.ts                    # פענוח קובץ DAT (לתאימות/בדיקות)
+    datParser.ts                    # עזרים משותפים (נרמול ת"ז, תאריך, בדיקת כפילויות)
     pdfChinuchParser.ts             # פרסר דו"ח "סיכום נתוני פרישה"
   pdfText.ts                        # חילוץ טקסט גנרי מ-PDF (mupdf)
   middleware/                       # headers, error handling
   utils/                            # config, logger
 test/                               # בדיקות אוטומציה (node:test + ts-node)
+  helpers/sampleData.ts             # בניית שורות טבלה מ-samples/sample.dat לצורך בדיקות בלבד
 samples/                            # קבצי דוגמה פיקטיביים לבדיקות
 ```
 
-**הרחבת המערכת** (סוג רשומת DAT חדש, פורמט דוח PDF חדש, תווית חדשה,
-השוואה מסוג חדש) — ראו את הערות התיעוד בראש `src/parsers/datParser.ts`,
-`src/pdfText.ts` ו-`src/mappings.ts`.
+פענוח בייטים גולמיים של קובץ DAT (קידוד DOS-862, טעינה לטבלה) **אינו חלק
+מהפרויקט הזה**: זהו שלב שקורה לפני קריאת ה-API (SQL*Loader בטעינה לטבלת
+`LD_CHINUCH_9050_TKUFOT_RETSIF`) — ה-API עצמו תמיד מקבל JSON. `test/helpers/sampleData.ts`
+מפענח את `samples/sample.dat` באופן מינימלי רק כדי להפיק נתוני בדיקה.
+
+**הרחבת המערכת** (פורמט דוח PDF חדש, תווית חדשה, השוואה מסוג חדש) — ראו
+את הערות התיעוד בראש `src/pdfText.ts` ו-`src/mappings.ts`.
 
 ## הערת פרטיות
 

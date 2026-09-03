@@ -1,17 +1,14 @@
-/** בדיקות מערכת: פענוח DAT, פענוח PDF והשוואה, על קבצי הדוגמה שב-samples/. */
+/** בדיקות מערכת: פענוח PDF והשוואה, על קבצי הדוגמה שב-samples/. */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { before, describe, it } from 'node:test';
 
-import iconv from 'iconv-lite';
-
 import { ROW_DAT_ONLY, ROW_DIFF, ROW_MATCH, ROW_PDF_ONLY, compareId } from '../src/comparator';
-import { parseDatBytes, parseDatFile } from '../src/parsers/datParser';
 import { parsePdfFile, toLogical, toVisual } from '../src/parsers/pdfChinuchParser';
+import { parseTableRows } from '../src/tableSource';
 import { CompareIdResult } from '../src/compare-types';
-
-const SAMPLES = path.join(__dirname, '..', 'samples');
+import { SAMPLES, sampleTableRows } from './helpers/sampleData';
 
 // ---------- פענוח בסיסי ----------
 
@@ -22,40 +19,6 @@ describe('היפוך חזותי/לוגי', () => {
         }
         // ספרות נשארות בסדר לוגי בצורה החזותית
         assert.ok(toVisual('פחות מ-1/3').startsWith('1/3'));
-    });
-});
-
-describe('פענוח DAT', () => {
-    it('פענוח קובץ הדוגמה', () => {
-        const dat = parseDatFile(path.join(SAMPLES, 'sample.dat'));
-        assert.deepEqual(Object.keys(dat.periodsById).sort(), ['12345678', '23456789', '34567890']);
-        const p = dat.periodsById['12345678'][0];
-        assert.equal(p.sugTkufa, 9999);
-        assert.equal(p.start, '01092010');
-        assert.equal(p.end, '31082015');
-        assert.equal(p.months, 60.0);
-        assert.equal(p.sugZchuyot, 2);
-        assert.equal(p.heikef, 1.0);
-        assert.equal(dat.errors.length, 0);
-        assert.equal(dat.warnings.length, 0);
-    });
-
-    it('שורות פגומות מדווחות כשגיאות', () => {
-        const data = iconv.encode(
-            '9050~0~1099~012345678~0~9999~01092010~31082015~06000~02~1000\r\n' +
-            '9050~0~1099~012345678~0~XXXX~01092015~31082016~01200~68~1000\r\n' + // לא מספרי
-            '9050~0~1099\r\n', // קצרה מדי
-            'cp862'
-        );
-        const res = parseDatBytes(data);
-        assert.equal(res.periodsById['12345678'].length, 1);
-        assert.equal(res.errors.length, 2);
-    });
-
-    it('אזהרה על תקופות כפולות', () => {
-        const row = '9050~0~1099~012345678~0~9999~01092010~31082015~06000~02~1000\r\n';
-        const res = parseDatBytes(iconv.encode(row + row, 'cp862'));
-        assert.ok(res.warnings.some((w) => w.includes('אותם תאריכים')));
     });
 });
 
@@ -79,11 +42,12 @@ describe('פענוח PDF', () => {
 // ---------- השוואה ----------
 
 /**
- * השוואת כל מספרי הזהות שבקובץ ה-DAT ובקבצי ה-PDF שבתיקייה, ת"ז מול ת"ז -
- * מקביל למה ש-compareAll עשתה בגרסה הקודמת, כשה-API עצמו משווה תמיד ת"ז אחת.
+ * השוואת כל מספרי הזהות שבנתוני הטבלה הזמנית (מ-sample.dat) ובקבצי ה-PDF
+ * שבתיקייה, ת"ז מול ת"ז - מקביל למה ש-compareAll עשתה בגרסה הקודמת, כשה-API
+ * עצמו משווה תמיד ת"ז אחת.
  */
 async function compareSamples(): Promise<Map<string, CompareIdResult>> {
-    const dat = parseDatFile(path.join(SAMPLES, 'sample.dat'));
+    const dat = parseTableRows(sampleTableRows());
     const pdfsById = new Map<string, { fname: string; result: Awaited<ReturnType<typeof parsePdfFile>> }>();
     for (const fname of fs.readdirSync(SAMPLES).sort()) {
         if (!fname.endsWith('.pdf')) continue;

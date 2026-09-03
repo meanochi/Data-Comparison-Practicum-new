@@ -1,0 +1,162 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "השוואת נתוני תקופות עבודה - API",
+    "version": "1.0.0",
+    "description": "API סגור המשווה בין נתוני תקופות עבודה (משורות טבלת LD_CHINUCH_9050_TKUFOT_RETSIF) לבין דוח PDF \"סיכום נתוני פרישה\", עבור תעודת זהות אחת בכל קריאה (אחד-על-אחד): שורות ה-rows ומסמך ה-pdf חייבים להיות של אותה ת\"ז."
+  },
+  "servers": [{ "url": "/" }],
+  "paths": {
+    "/api/compare": {
+      "post": {
+        "summary": "השוואת שורות טבלה מול מסמך PDF (ת\"ז אחת)",
+        "description": "אחד-על-אחד: rows חייב להכיל שורות של תעודת זהות אחת בלבד; בקשה עם יותר מת\"ז אחת נדחית עם 400. ניתן לשלוח בשתי צורות שקולות: JSON גולמי (pdf מקודד base64) או multipart/form-data (pdf כקובץ מצורף ממש, rows כשדה טקסט עם מערך JSON).",
+        "parameters": [
+          {
+            "name": "full",
+            "in": "query",
+            "required": false,
+            "description": "כשהערך '1', מוסיף לתשובה גם summary/warnings/results (הפירוט המלא שמסך התוצאות מציג). ברירת המחדל מחזירה תשובה רזה.",
+            "schema": { "type": "string", "enum": ["1"] }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CompareRequestJson" },
+              "example": {
+                "rows": [
+                  {
+                    "MISPAR_TNUA": "9050",
+                    "KOD_PEULA": "0",
+                    "SEMEL_MISRAD": "0",
+                    "MISPAR_ZEHUT": "012345678",
+                    "ZIHUY_NOSAF": "0",
+                    "SUG_TKUFA": "9999",
+                    "TAARICH_ME": "01092010",
+                    "TAARICH_AD": "31082015",
+                    "ORECH_SHERUT": "06000",
+                    "SUG_ZECHUYOT_LEGIMLA": "02",
+                    "HEKEF_MISRA": "1000",
+                    "SEQ": 1
+                  }
+                ],
+                "pdf": {
+                  "filename": "report_12345678.pdf",
+                  "content": "<PDF בקידוד base64>"
+                }
+              }
+            },
+            "multipart/form-data": {
+              "schema": { "$ref": "#/components/schemas/CompareRequestForm" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "ההשוואה בוצעה (גם כשהתוצאה אינה תקינה - valid=0 אינו שגיאת HTTP)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CompareResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "בקשה לא תקינה: rows/pdf חסרים, יותר מת\"ז אחת ב-rows, או rows שאינו JSON תקין (במצב form-data)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "TableRow": {
+        "type": "object",
+        "description": "שורת LD_CHINUCH_9050_TKUFOT_RETSIF; שמות העמודות כמפתחות, כפי שמוחזר מ-SELECT על הטבלה. עמודות עודפות (למשל LOAD_DATE) מותרות ומתעלמים מהן.",
+        "additionalProperties": true,
+        "properties": {
+          "MISPAR_TNUA": { "type": "string", "example": "9050" },
+          "MISPAR_ZEHUT": { "type": "string", "example": "012345678" },
+          "SUG_TKUFA": { "type": "string", "example": "9999" },
+          "TAARICH_ME": { "type": "string", "description": "DDMMYYYY", "example": "01092010" },
+          "TAARICH_AD": { "type": "string", "description": "DDMMYYYY", "example": "31082015" },
+          "ORECH_SHERUT": { "type": "string", "description": "חודשים כפול 100", "example": "06000" },
+          "SUG_ZECHUYOT_LEGIMLA": { "type": "string", "example": "02" },
+          "HEKEF_MISRA": { "type": "string", "description": "כפול 1000", "example": "1000" },
+          "SEQ": { "type": "integer", "example": 1 }
+        }
+      },
+      "PdfFile": {
+        "type": "object",
+        "required": ["filename", "content"],
+        "properties": {
+          "filename": { "type": "string", "example": "report_12345678.pdf" },
+          "content": { "type": "string", "format": "byte", "description": "תוכן קובץ ה-PDF בקידוד base64" }
+        }
+      },
+      "CompareRequestJson": {
+        "type": "object",
+        "required": ["rows", "pdf"],
+        "properties": {
+          "rows": { "type": "array", "items": { "$ref": "#/components/schemas/TableRow" } },
+          "pdf": { "$ref": "#/components/schemas/PdfFile" }
+        }
+      },
+      "CompareRequestForm": {
+        "type": "object",
+        "required": ["rows", "pdf"],
+        "properties": {
+          "rows": {
+            "type": "string",
+            "description": "מערך שורות הטבלה, מקודד כמחרוזת JSON",
+            "example": "[{\"MISPAR_TNUA\":\"9050\",\"MISPAR_ZEHUT\":\"012345678\",\"SUG_TKUFA\":\"9999\",\"TAARICH_ME\":\"01092010\",\"TAARICH_AD\":\"31082015\",\"ORECH_SHERUT\":\"06000\",\"SUG_ZECHUYOT_LEGIMLA\":\"02\",\"HEKEF_MISRA\":\"1000\",\"SEQ\":1}]"
+          },
+          "pdf": { "type": "string", "format": "binary", "description": "קובץ ה-PDF, מצורף ממש" }
+        }
+      },
+      "RowResult": {
+        "type": "object",
+        "description": "אותה שורה שנשלחה ב-rows, על כל שדותיה המקוריים, בתוספת:",
+        "additionalProperties": true,
+        "properties": {
+          "valid": { "type": "integer", "enum": [0, 1], "description": "1 אם נמצאה תואמת במלואה במסמך, 0 אחרת" },
+          "reason": { "type": "string", "description": "פירוט הפער כשאינה תקינה (מופיע רק כש-valid=0, או הערה כש-valid=1 למשל שורת עזיבה)" }
+        }
+      },
+      "CompareResponse": {
+        "type": "object",
+        "properties": {
+          "valid": { "type": "integer", "enum": [0, 1], "description": "1 רק כשכל התקופות תואמות במלואן" },
+          "idNumber": { "type": ["string", "null"], "example": "12345678" },
+          "rows": { "type": "array", "items": { "$ref": "#/components/schemas/RowResult" } },
+          "text": { "type": "string", "description": "טקסט מאוחד המרכז את כל התוצאות והפערים" },
+          "summary": {
+            "type": "object",
+            "description": "מוחזר רק כש-?full=1",
+            "properties": {
+              "total": { "type": "integer" },
+              "match": { "type": "integer" },
+              "mismatch": { "type": "integer" },
+              "missing": { "type": "integer" },
+              "error": { "type": "integer" }
+            }
+          },
+          "warnings": { "type": "array", "items": { "type": "string" }, "description": "מוחזר רק כש-?full=1" },
+          "results": { "type": "array", "items": { "type": "object" }, "description": "מוחזר רק כש-?full=1 - הפירוט המלא (מה שמסך התוצאות מציג)" }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": { "type": "string" }
+        }
+      }
+    }
+  }
+}

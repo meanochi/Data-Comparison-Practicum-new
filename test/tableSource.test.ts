@@ -1,8 +1,5 @@
 /**
  * בדיקות למקור הטבלה הזמנית (tableSource) ול-API (POST /api/compare).
- *
- * בדיקת הליבה: אותם נתונים שמגיעים דרך קובץ DAT ודרך שורות טבלה חייבים
- * להניב בדיוק את אותה תוצאת פענוח.
  */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -11,46 +8,11 @@ import { Server } from 'node:http';
 import { after, before, describe, it } from 'node:test';
 
 import { compareId } from '../src/comparator';
-import { decodeDat, parseDatFile } from '../src/parsers/datParser';
 import { parsePdfFile } from '../src/parsers/pdfChinuchParser';
 import { parseTableRows } from '../src/tableSource';
 import { StartApp } from '../src/startApp';
 import { CompareController } from '../src/components/compare/compare.controller';
-
-const SAMPLES = path.join(__dirname, '..', 'samples');
-
-/**
- * המרת שורת DAT לרשומת טבלה, לפי סדר העמודות בבלוק 9050 של LD_Chinuch.ctl:
- * MISPAR_TNUA, KOD_PEULA, SEMEL_MISRAD, MISPAR_ZEHUT, ZIHUY_NOSAF, SUG_TKUFA,
- * TAARICH_ME, TAARICH_AD, ORECH_SHERUT, SUG_ZECHUYOT_LEGIMLA, HEKEF_MISRA.
- */
-function datLineToRow(line: string, seq: number): Record<string, unknown> {
-    const f = line.replace(/\s+$/, '').split('~');
-    return {
-        MISPAR_TNUA: f[0],
-        KOD_PEULA: f[1],
-        SEMEL_MISRAD: f[2],
-        MISPAR_ZEHUT: f[3],
-        ZIHUY_NOSAF: f[4],
-        SUG_TKUFA: f[5],
-        TAARICH_ME: f[6],
-        TAARICH_AD: f[7],
-        ORECH_SHERUT: f[8],
-        SUG_ZECHUYOT_LEGIMLA: f[9],
-        HEKEF_MISRA: f[10],
-        SEQ: seq,
-    };
-}
-
-/** שורות הדוגמה כפי שהיו נראות בטבלה הזמנית (רק רשומות 9050, SEQ = מספר שורה). */
-function sampleTableRows(): Record<string, unknown>[] {
-    const text = decodeDat(fs.readFileSync(path.join(SAMPLES, 'sample.dat')));
-    return text
-        .split(/\r\n|\r|\n/)
-        .map((line, i): [string, number] => [line, i + 1])
-        .filter(([line]) => line.startsWith('9050~'))
-        .map(([line, lineNo]) => datLineToRow(line, lineNo));
-}
+import { SAMPLES, sampleTableRows } from './helpers/sampleData';
 
 const ROW_12345678 = {
     MISPAR_TNUA: '9050',
@@ -65,12 +27,6 @@ const ROW_12345678 = {
 };
 
 describe('פענוח שורות מהטבלה הזמנית', () => {
-    it('שקילות מלאה לפענוח ה-DAT על נתוני הדוגמה', () => {
-        const fromDat = parseDatFile(path.join(SAMPLES, 'sample.dat'));
-        const fromTable = parseTableRows(sampleTableRows());
-        assert.deepEqual(fromTable, fromDat);
-    });
-
     it('רשומות שאינן 9050 מדולגות בשקט', () => {
         const res = parseTableRows([{ ...ROW_12345678, MISPAR_TNUA: '9022' }, ROW_12345678]);
         assert.equal(res.periodsById['12345678'].length, 1);
@@ -179,6 +135,12 @@ describe('POST /api/compare', () => {
         assert.equal(status, 200);
         assert.equal(body.valid, 0);
         assert.equal(body.results[0].status, 'missing_dat');
+    });
+
+    it('תיעוד ה-API זמין ב-/api-docs (Swagger UI)', async () => {
+        const resp = await fetch(`${baseUrl}/api-docs/`);
+        assert.equal(resp.status, 200);
+        assert.ok((await resp.text()).includes('swagger-ui'));
     });
 
     it('התשובה כברירת מחדל רזה: valid, idNumber, rows, text בלבד', async () => {

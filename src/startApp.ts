@@ -1,7 +1,10 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import cors from 'cors';
 import express, { Express } from 'express';
 import fileUpload from 'express-fileupload';
 import morgan from 'morgan';
+import swaggerUi from 'swagger-ui-express';
 import { IController } from '../IController';
 import { HeadersMiddleware } from './middleware/headers-middleware';
 import { logErrors } from './middleware/logErrors-middleware';
@@ -19,6 +22,7 @@ export class StartApp {
         this.initializeMiddlewares();
         this.initializeControllers(controllers);
         this.initializeHealthcheck();
+        this.initializeSwagger();
         this.initializeErrorHandling();
     }
 
@@ -44,6 +48,17 @@ export class StartApp {
         this.app.get('/api/healthcheck', (_req, res) => {
             res.json({ status: 'ok' });
         });
+    }
+
+    /**
+     * תיעוד אינטראקטיבי של ה-API (Swagger UI): /api-docs, לפי openapi.json.
+     * openapi.json אינו קובץ TypeScript ואינו מועתק ל-build/ על ידי tsc,
+     * ולכן נקרא יחסית לתיקיית ההרצה (שורש הפרויקט) ולא ל-__dirname - כך זה
+     * עובד גם תחת ts-node (dev/start) וגם מריצה של build/app.js.
+     */
+    private initializeSwagger(): void {
+        const openapiSpec = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'openapi.json'), 'utf8'));
+        this.app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(openapiSpec));
     }
 
     private initializeErrorHandling(): void {
