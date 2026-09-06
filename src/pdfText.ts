@@ -83,6 +83,38 @@ export function normalizeDashes(s: string): string {
     return s.replace(/[­־‐-―]/g, '-');
 }
 
+/**
+ * חלק ממחוללי PDF (בדוחות אמיתיים) משבצים טבלת ToUnicode שגויה לפונט
+ * העברי: כל תו מוצהר בהיסט קבוע מתחת לקוד היוניקוד האמיתי שלו, בשני טווחים
+ * נפרדים שאומתו על דוח אמיתי:
+ *   - אותיות עבריות: היסט 0x330 (למשל א, U+05D0, מוצהרת כ-U+02A0 - טווח
+ *     "IPA Extensions"/"Spacing Modifier Letters" שאין לו שימוש לגיטימי
+ *     בדוח עברי).
+ *   - תווי פיסוק בסיסיים בתוך אותו פונט (רווח, נקודתיים, גרש) - מוצהרים
+ *     כתווי בקרה נמוכים (0x00-0x1F, למשל רווח כ-U+0003), היסט 0x1D.
+ * מכיוון שה-ToUnicode קיים, mupdf סומך עליו ומחזיר את הקוד השגוי ישירות -
+ * התיקון כאן מזהה את שני הטווחים החשודים ומתקן אותם בחזרה לתו האמיתי.
+ */
+const SHIFTED_HEBREW_LOW = 0x02a0; // 'א' (U+05D0) פחות ההיסט
+const SHIFTED_HEBREW_HIGH = 0x02ba; // 'ת' (U+05EA) פחות ההיסט
+const SHIFTED_HEBREW_OFFSET = 0x0330;
+
+const SHIFTED_PUNCTUATION_LOW = 0x00;
+const SHIFTED_PUNCTUATION_HIGH = 0x1f;
+const SHIFTED_PUNCTUATION_OFFSET = 0x1d;
+
+function fixShiftedHebrew(c: string): string {
+    const code = c.codePointAt(0);
+    if (code === undefined) return c;
+    if (code >= SHIFTED_HEBREW_LOW && code <= SHIFTED_HEBREW_HIGH) {
+        return String.fromCodePoint(code + SHIFTED_HEBREW_OFFSET);
+    }
+    if (code >= SHIFTED_PUNCTUATION_LOW && code <= SHIFTED_PUNCTUATION_HIGH) {
+        return String.fromCodePoint(code + SHIFTED_PUNCTUATION_OFFSET);
+    }
+    return c;
+}
+
 /** פענוח טבלת cmap של פונט TrueType: מחזיר מיפוי GID -> קוד יוניקוד. */
 function ttfGidToUnicode(bytes: Uint8Array): Map<number, number> | null {
     try {
@@ -254,6 +286,7 @@ function pageToVisualLines(page: any, gidMaps: Map<string, GidMapEntry | null>, 
                         c = String.fromCodePoint(uni);
                     }
                 }
+                c = fixShiftedHebrew(c);
                 // quad: [ulx, uly, urx, ury, llx, lly, lrx, lry]
                 chars.push({
                     c,
