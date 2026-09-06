@@ -81,7 +81,7 @@ describe('השוואה מלאה מנתוני הטבלה הזמנית', () => {
         assert.equal(byId.get('12345678'), 'match');
         assert.equal(byId.get('23456789'), 'mismatch');
         assert.equal(byId.get('34567890'), 'missing_pdf');
-        assert.equal(byId.get('45678901'), 'missing_dat');
+        assert.equal(byId.get('45678901'), 'missing_data');
     });
 });
 
@@ -134,7 +134,7 @@ describe('POST /api/compare', () => {
         [status, body] = await post({ rows: [], pdf: pdfOf('45678901') }, { full: true });
         assert.equal(status, 200);
         assert.equal(body.valid, 0);
-        assert.equal(body.results[0].status, 'missing_dat');
+        assert.equal(body.results[0].status, 'missing_data');
     });
 
     it('תיעוד ה-API זמין ב-/api-docs (Swagger UI)', async () => {

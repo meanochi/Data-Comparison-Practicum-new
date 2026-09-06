@@ -43,6 +43,31 @@ export const SUG_ZCHUYOT: Record<number, string> = {
     72: "ביטוח בצוברת",
 };
 
+// נרמול תווית לצורך התאמה: הסרת מקפים, גרשיים/גרש, תווי בקרה ורווחים
+// כפולים. חלק מגרסאות הדו"ח מדפיסות תווית קצת שונה מהצורה ה"רשמית" -
+// למשל "פחות מ1/3" בלי המקף שמופיע ב"פחות מ-1/3", או "חלת" בלי הגרש
+// שמופיע ב-'חל"ת'. בנוסף, בפונטים משובצים שבורים (ראו pdfText.ts) מקף/גרש
+// עלולים לצאת כתו בקרה שרירותי במקום התו ה"רשמי" - ומכיוון שהוא תמיד יושב
+// צמוד בלי רווחים משלו, גם הסרה גורפת של כל תו בקרה (לא רק המקרים
+// שכבר תוקנו בשכבת החילוץ) בטוחה ומספיקה כדי להגיע לאותה תוצאה מנורמלת.
+function normalizeLabel(s: string): string {
+    return s
+        .replace(/[\x00-\x1f\x7f]/g, '')
+        .replace(/[-"'״׳]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+/** חיפוש תווית PDF במפת תוויות, עם נפילה חזרה להתאמה מנורמלת (בלי מקפים/גרשיים/תווי בקרה). */
+export function lookupPdfLabel(map: Record<string, Set<number>>, label: string): Set<number> | undefined {
+    if (label in map) return map[label];
+    const normalized = normalizeLabel(label);
+    for (const key of Object.keys(map)) {
+        if (normalizeLabel(key) === normalized) return map[key];
+    }
+    return undefined;
+}
+
 // תווית "סוג זכויות לפנסיה" כפי שמודפסת ב-PDF -> קבוצת קודי DAT אפשריים.
 // תווית אחת יכולה לייצג יותר מקוד אחד (למשל "לא נושא זכויות").
 export const PDF_ZCHUYOT_LABELS: Record<string, Set<number>> = {
@@ -52,6 +77,13 @@ export const PDF_ZCHUYOT_LABELS: Record<string, Set<number>> = {
     "נושא זכויות": new Set([68, 9]),
     "פחות מ-1/3": new Set([69]),
     "שבתון": new Set([67]),
+    // "צרוף שרות" (קוד 6) - שני הכתיבים (מלא/חסר) כדי לכסות את שתי הגרסאות
+    "צירוף שרות": new Set([6]),
+    "צרוף שרות": new Set([6]),
+    // קיצור של "זכויות על חשבון קרן" (קוד 7)
+    "זכ עח הקרן": new Set([7]),
+    // ניסוח חלופי ל"שולמו פיצויים" (קוד 3)
+    "ניתנו פיצויים": new Set([3]),
 };
 
 // תווית "סוג תקופה" ב-PDF -> קבוצת קודי DAT אפשריים.

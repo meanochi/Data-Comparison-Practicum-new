@@ -1,5 +1,5 @@
 /** תקופת עבודה אחת מקובץ ה-DAT (או מהטבלה הזמנית - אותו מבנה). */
-export interface DatPeriod {
+export interface DataPeriod {
     idNumber: string;
     sugTkufa: number;
     start: string;
@@ -11,7 +11,7 @@ export interface DatPeriod {
 }
 
 export interface ParseResult {
-    periodsById: Record<string, DatPeriod[]>;
+    periodsById: Record<string, DataPeriod[]>;
     warnings: string[];
     errors: string[];
 }
@@ -38,12 +38,12 @@ export interface PdfParseResult {
 export interface FieldDiff {
     fieldName: string;
     pdfValue: string;
-    datValue: string;
+    dataValue: string;
 }
 
-export type RowStatus = 'match' | 'diff' | 'dat_only' | 'pdf_only';
+export type RowStatus = 'match' | 'diff' | 'data_only' | 'pdf_only';
 
-export interface DatRowDict {
+export interface DataRowDict {
     sugTkufa: number;
     sugTkufaTeur: string;
     start: string;
@@ -70,12 +70,12 @@ export interface CompareRowResult {
     end: string | null;
     diffs: FieldDiff[];
     pdfRow: PdfRowDict | null;
-    datRow: DatRowDict | null;
+    dataRow: DataRowDict | null;
     startDisplay: string;
     endDisplay: string;
 }
 
-export type IdCompareStatus = 'match' | 'mismatch' | 'missing_pdf' | 'missing_dat' | 'error';
+export type IdCompareStatus = 'match' | 'mismatch' | 'missing_pdf' | 'missing_data' | 'error';
 
 export interface CompareIdResult {
     idNumber: string;
@@ -84,7 +84,7 @@ export interface CompareIdResult {
     totalCompared: number;
     matched: number;
     rows: CompareRowResult[];
-    excluded: DatRowDict[];
+    excluded: DataRowDict[];
     warnings: string[];
     errors: string[];
     percent: number;

@@ -7,6 +7,7 @@
 import { fmtDate } from './parsers/datParser';
 import {
     EXCLUDED_TKUFA_CODES,
+    lookupPdfLabel,
     PDF_TKUFA_LABELS,
     PDF_ZCHUYOT_LABELS,
     SABBATICAL_LABEL,
@@ -18,8 +19,8 @@ import {
 import {
     CompareIdResult,
     CompareRowResult,
-    DatPeriod,
-    DatRowDict,
+    DataPeriod,
+    DataRowDict,
     FieldDiff,
     PdfParseResult,
     PdfPeriod,
@@ -33,7 +34,7 @@ const HEIKEF_TOLERANCE = 0.0005;
 // סטטוסים לשורה בודדת
 export const ROW_MATCH: RowStatus = 'match'; // כל השדות זהים
 export const ROW_DIFF: RowStatus = 'diff'; // נמצאה אי-התאמה בשדות
-export const ROW_DAT_ONLY: RowStatus = 'dat_only'; // תקופה שקיימת רק ב-DAT
+export const ROW_DATA_ONLY: RowStatus = 'data_only'; // תקופה שקיימת רק ב-DAT
 export const ROW_PDF_ONLY: RowStatus = 'pdf_only'; // תקופה שקיימת רק ב-PDF
 
 /** עיצוב מספר בסגנון %g של פייתון (6 ספרות משמעותיות, בלי אפסים עודפים). */
@@ -48,14 +49,14 @@ function rowResult(status: RowStatus, start: string | null = null, end: string |
         end,
         diffs: [],
         pdfRow: null,
-        datRow: null,
+        dataRow: null,
         startDisplay: start ? fmtDate(start) : '',
         endDisplay: end ? fmtDate(end) : '',
         ...extra,
     };
 }
 
-function datRowDict(d: DatPeriod): DatRowDict {
+function dataRowDict(d: DataPeriod): DataRowDict {
     return {
         sugTkufa: d.sugTkufa,
         sugTkufaTeur: SUG_TKUFA[d.sugTkufa] ?? `קוד לא מוכר (${d.sugTkufa})`,
@@ -81,21 +82,21 @@ function pdfRowDict(p: PdfPeriod): PdfRowDict {
 }
 
 /** השוואת שורה בודדת. מחזיר רשימת אי-התאמות (ריקה = זהה). */
-function compareRow(pdfRow: PdfPeriod, datRow: DatPeriod, warnings: string[]): FieldDiff[] {
+function compareRow(pdfRow: PdfPeriod, dataRow: DataPeriod, warnings: string[]): FieldDiff[] {
     const diffs: FieldDiff[] = [];
 
     // סוג תקופה. כלל מיוחד: "שבתון" ב-PDF = קוד 2 + זכויות 67 ב-DAT
     if (pdfRow.tkufaLabel === SABBATICAL_LABEL) {
-        const ok = datRow.sugTkufa === SABBATICAL_TKUFA_CODE && datRow.sugZchuyot === SABBATICAL_ZCHUYOT_CODE;
+        const ok = dataRow.sugTkufa === SABBATICAL_TKUFA_CODE && dataRow.sugZchuyot === SABBATICAL_ZCHUYOT_CODE;
         if (!ok) {
             diffs.push({
                 fieldName: 'סוג תקופה',
                 pdfValue: 'שבתון',
-                datValue: `${datRow.sugTkufa} (${SUG_TKUFA[datRow.sugTkufa] ?? 'לא מוכר'}) + זכויות ${datRow.sugZchuyot}`,
+                dataValue: `${dataRow.sugTkufa} (${SUG_TKUFA[dataRow.sugTkufa] ?? 'לא מוכר'}) + זכויות ${dataRow.sugZchuyot}`,
             });
         }
     } else {
-        const allowed = PDF_TKUFA_LABELS[pdfRow.tkufaLabel];
+        const allowed = lookupPdfLabel(PDF_TKUFA_LABELS, pdfRow.tkufaLabel);
         if (allowed === undefined) {
             warnings.push(
                 `תווית סוג תקופה לא מוכרת ב-PDF: "${pdfRow.tkufaLabel}" ` +
@@ -104,28 +105,28 @@ function compareRow(pdfRow: PdfPeriod, datRow: DatPeriod, warnings: string[]): F
             diffs.push({
                 fieldName: 'סוג תקופה',
                 pdfValue: `${pdfRow.tkufaLabel} (תווית לא מוכרת)`,
-                datValue: `${datRow.sugTkufa} (${SUG_TKUFA[datRow.sugTkufa] ?? 'לא מוכר'})`,
+                dataValue: `${dataRow.sugTkufa} (${SUG_TKUFA[dataRow.sugTkufa] ?? 'לא מוכר'})`,
             });
-        } else if (!allowed.has(datRow.sugTkufa)) {
+        } else if (!allowed.has(dataRow.sugTkufa)) {
             diffs.push({
                 fieldName: 'סוג תקופה',
                 pdfValue: pdfRow.tkufaLabel,
-                datValue: `${datRow.sugTkufa} (${SUG_TKUFA[datRow.sugTkufa] ?? 'לא מוכר'})`,
+                dataValue: `${dataRow.sugTkufa} (${SUG_TKUFA[dataRow.sugTkufa] ?? 'לא מוכר'})`,
             });
         }
     }
 
     // אורך שירות (חודשים)
-    if (Math.abs(pdfRow.months - datRow.months) > MONTHS_TOLERANCE) {
+    if (Math.abs(pdfRow.months - dataRow.months) > MONTHS_TOLERANCE) {
         diffs.push({
             fieldName: 'אורך שירות (חודשים)',
             pdfValue: fmtG(pdfRow.months),
-            datValue: fmtG(datRow.months),
+            dataValue: fmtG(dataRow.months),
         });
     }
 
     // סוג זכויות
-    const allowedZ = PDF_ZCHUYOT_LABELS[pdfRow.zchuyotLabel];
+    const allowedZ = lookupPdfLabel(PDF_ZCHUYOT_LABELS, pdfRow.zchuyotLabel);
     if (allowedZ === undefined) {
         warnings.push(
             `תווית סוג זכויות לא מוכרת ב-PDF: "${pdfRow.zchuyotLabel}" ` +
@@ -134,29 +135,29 @@ function compareRow(pdfRow: PdfPeriod, datRow: DatPeriod, warnings: string[]): F
         diffs.push({
             fieldName: 'סוג זכויות',
             pdfValue: `${pdfRow.zchuyotLabel} (תווית לא מוכרת)`,
-            datValue: `${datRow.sugZchuyot} (${SUG_ZCHUYOT[datRow.sugZchuyot] ?? 'לא מוכר'})`,
+            dataValue: `${dataRow.sugZchuyot} (${SUG_ZCHUYOT[dataRow.sugZchuyot] ?? 'לא מוכר'})`,
         });
-    } else if (!allowedZ.has(datRow.sugZchuyot)) {
+    } else if (!allowedZ.has(dataRow.sugZchuyot)) {
         diffs.push({
             fieldName: 'סוג זכויות',
             pdfValue: pdfRow.zchuyotLabel,
-            datValue: `${datRow.sugZchuyot} (${SUG_ZCHUYOT[datRow.sugZchuyot] ?? 'לא מוכר'})`,
+            dataValue: `${dataRow.sugZchuyot} (${SUG_ZCHUYOT[dataRow.sugZchuyot] ?? 'לא מוכר'})`,
         });
     }
 
     // היקף משרה
-    if (Math.abs(pdfRow.heikef - datRow.heikef) > HEIKEF_TOLERANCE) {
+    if (Math.abs(pdfRow.heikef - dataRow.heikef) > HEIKEF_TOLERANCE) {
         diffs.push({
             fieldName: 'היקף משרה',
             pdfValue: pdfRow.heikef.toFixed(3),
-            datValue: datRow.heikef.toFixed(3),
+            dataValue: dataRow.heikef.toFixed(3),
         });
     }
     return diffs;
 }
 
 /** תאימות סוג תקופה בין תווית ה-PDF לקוד בנתונים (כולל כלל השבתון). */
-function tkufaCompatible(p: PdfPeriod, d: DatPeriod): boolean {
+function tkufaCompatible(p: PdfPeriod, d: DataPeriod): boolean {
     if (p.tkufaLabel === SABBATICAL_LABEL) {
         return d.sugTkufa === SABBATICAL_TKUFA_CODE && d.sugZchuyot === SABBATICAL_ZCHUYOT_CODE;
     }
@@ -164,7 +165,7 @@ function tkufaCompatible(p: PdfPeriod, d: DatPeriod): boolean {
 }
 
 /** תאימות סוג זכויות בין תווית ה-PDF לקוד בנתונים. */
-function zchuyotCompatible(p: PdfPeriod, d: DatPeriod): boolean {
+function zchuyotCompatible(p: PdfPeriod, d: DataPeriod): boolean {
     return PDF_ZCHUYOT_LABELS[p.zchuyotLabel]?.has(d.sugZchuyot) ?? false;
 }
 
@@ -172,7 +173,7 @@ function zchuyotCompatible(p: PdfPeriod, d: DatPeriod): boolean {
  * ניקוד דמיון בין תקופת PDF לתקופת נתונים, לזיהוי "שורה עם שגיאה":
  * תאריכים שווים שוקלים 2 כל אחד, שאר השדות 1 כל אחד (מקסימום 8).
  */
-function similarityScore(p: PdfPeriod, d: DatPeriod): number {
+function similarityScore(p: PdfPeriod, d: DataPeriod): number {
     let score = 0;
     if (p.start === d.start) score += 2;
     if (p.end === d.end) score += 2;
@@ -188,13 +189,13 @@ const FUZZY_MIN_SCORE = 4;
 
 /**
  * צימוד תקופות שנשארו ללא התאמה מדויקת משני הצדדים, כשהן כמעט זהות.
- * מחזיר רשימת זוגות [pdfPeriod, datPeriod] ממוינת מהדמיון הגבוה לנמוך;
+ * מחזיר רשימת זוגות [pdfPeriod, dataPeriod] ממוינת מהדמיון הגבוה לנמוך;
  * כל תקופה משתתפת בזוג אחד לכל היותר, ונדרש לפחות תאריך אחד זהה.
  */
-function pairAlmostIdentical(pdfLeft: PdfPeriod[], datLeft: DatPeriod[]): [PdfPeriod, DatPeriod][] {
-    const candidates: [number, PdfPeriod, DatPeriod][] = [];
+function pairAlmostIdentical(pdfLeft: PdfPeriod[], dataLeft: DataPeriod[]): [PdfPeriod, DataPeriod][] {
+    const candidates: [number, PdfPeriod, DataPeriod][] = [];
     for (const p of pdfLeft) {
-        for (const d of datLeft) {
+        for (const d of dataLeft) {
             if (p.start !== d.start && p.end !== d.end) continue;
             const score = similarityScore(p, d);
             if (score >= FUZZY_MIN_SCORE) candidates.push([score, p, d]);
@@ -202,8 +203,8 @@ function pairAlmostIdentical(pdfLeft: PdfPeriod[], datLeft: DatPeriod[]): [PdfPe
     }
     candidates.sort((a, b) => b[0] - a[0]);
     const usedP = new Set<PdfPeriod>();
-    const usedD = new Set<DatPeriod>();
-    const pairs: [PdfPeriod, DatPeriod][] = [];
+    const usedD = new Set<DataPeriod>();
+    const pairs: [PdfPeriod, DataPeriod][] = [];
     for (const [, p, d] of candidates) {
         if (usedP.has(p) || usedD.has(d)) continue;
         usedP.add(p);
@@ -222,13 +223,13 @@ function finalizeIdResult(res: CompareIdResult): CompareIdResult {
 /** השוואת כל התקופות של מספר זהות אחד. */
 export function compareId(
     idNumber: string,
-    datPeriods: DatPeriod[] | undefined,
+    dataPeriods: DataPeriod[] | undefined,
     pdfResult: PdfParseResult | null | undefined,
     pdfFile: string | null = null
 ): CompareIdResult {
     const res: CompareIdResult = {
         idNumber,
-        status: 'match', // 'match' / 'mismatch' / 'missing_pdf' / 'missing_dat' / 'error'
+        status: 'match', // 'match' / 'mismatch' / 'missing_pdf' / 'missing_data' / 'error'
         pdfFile,
         totalCompared: 0, // מספר התקופות שהושוו
         matched: 0, // מכללן - כמה זהות לחלוטין
@@ -244,13 +245,13 @@ export function compareId(
         res.errors.push(...pdfResult.errors);
     }
 
-    const allPeriods = datPeriods || [];
+    const allPeriods = dataPeriods || [];
     const active = allPeriods.filter((d) => !EXCLUDED_TKUFA_CODES.has(d.sugTkufa));
-    res.excluded = allPeriods.filter((d) => EXCLUDED_TKUFA_CODES.has(d.sugTkufa)).map(datRowDict);
+    res.excluded = allPeriods.filter((d) => EXCLUDED_TKUFA_CODES.has(d.sugTkufa)).map(dataRowDict);
 
     if (pdfResult === null || pdfResult === undefined) {
         res.status = 'missing_pdf';
-        res.rows = active.map((d) => rowResult(ROW_DAT_ONLY, d.start, d.end, { datRow: datRowDict(d) }));
+        res.rows = active.map((d) => rowResult(ROW_DATA_ONLY, d.start, d.end, { dataRow: dataRowDict(d) }));
         return finalizeIdResult(res);
     }
     if (pdfResult.errors.length > 0) {
@@ -258,21 +259,21 @@ export function compareId(
         return finalizeIdResult(res);
     }
     if (allPeriods.length === 0) {
-        res.status = 'missing_dat';
+        res.status = 'missing_data';
         res.rows = pdfResult.periods.map((p) => rowResult(ROW_PDF_ONLY, p.start, p.end, { pdfRow: pdfRowDict(p) }));
         return finalizeIdResult(res);
     }
 
     const pdfMap = new Map(pdfResult.periods.map((p) => [`${p.start}|${p.end}`, p]));
     const matchedKeys = new Set<string>();
-    const datLeft: DatPeriod[] = [];
+    const dataLeft: DataPeriod[] = [];
 
     // שלב 1: התאמה מדויקת לפי (תאריך התחלה, תאריך סיום)
     for (const d of active) {
         const key = `${d.start}|${d.end}`;
         const p = pdfMap.get(key);
         if (p === undefined) {
-            datLeft.push(d);
+            dataLeft.push(d);
             continue;
         }
         matchedKeys.add(key);
@@ -280,34 +281,34 @@ export function compareId(
         const diffs = compareRow(p, d, res.warnings);
         const status = diffs.length === 0 ? ROW_MATCH : ROW_DIFF;
         if (diffs.length === 0) res.matched += 1;
-        res.rows.push(rowResult(status, d.start, d.end, { diffs, pdfRow: pdfRowDict(p), datRow: datRowDict(d) }));
+        res.rows.push(rowResult(status, d.start, d.end, { diffs, pdfRow: pdfRowDict(p), dataRow: dataRowDict(d) }));
     }
     const pdfLeft = pdfResult.periods.filter((p) => !matchedKeys.has(`${p.start}|${p.end}`));
 
     // שלב 2: זיהוי "שורה עם שגיאה" - תקופות כמעט זהות שנשארו משני הצדדים
     // מדווחות כשורה שגויה אחת עם פירוט ההבדלים (כולל הפרשי תאריכים),
     // במקום "קיימת רק בנתונים" + "קיימת רק במסמך".
-    const pairs = pairAlmostIdentical(pdfLeft, datLeft);
+    const pairs = pairAlmostIdentical(pdfLeft, dataLeft);
     for (const [p, d] of pairs) {
         res.totalCompared += 1;
         const diffs: FieldDiff[] = [];
         if (p.start !== d.start) {
-            diffs.push({ fieldName: 'מתאריך', pdfValue: fmtDate(p.start), datValue: fmtDate(d.start) });
+            diffs.push({ fieldName: 'מתאריך', pdfValue: fmtDate(p.start), dataValue: fmtDate(d.start) });
         }
         if (p.end !== d.end) {
-            diffs.push({ fieldName: 'עד תאריך', pdfValue: fmtDate(p.end), datValue: fmtDate(d.end) });
+            diffs.push({ fieldName: 'עד תאריך', pdfValue: fmtDate(p.end), dataValue: fmtDate(d.end) });
         }
         diffs.push(...compareRow(p, d, res.warnings));
-        res.rows.push(rowResult(ROW_DIFF, d.start, d.end, { diffs, pdfRow: pdfRowDict(p), datRow: datRowDict(d) }));
+        res.rows.push(rowResult(ROW_DIFF, d.start, d.end, { diffs, pdfRow: pdfRowDict(p), dataRow: dataRowDict(d) }));
     }
     const pairedD = new Set(pairs.map(([, d]) => d));
     const pairedP = new Set(pairs.map(([p]) => p));
 
     // שלב 3: מה שבאמת נשאר בצד אחד בלבד
-    for (const d of datLeft) {
+    for (const d of dataLeft) {
         if (pairedD.has(d)) continue;
         res.totalCompared += 1;
-        res.rows.push(rowResult(ROW_DAT_ONLY, d.start, d.end, { datRow: datRowDict(d) }));
+        res.rows.push(rowResult(ROW_DATA_ONLY, d.start, d.end, { dataRow: dataRowDict(d) }));
     }
     for (const p of pdfLeft) {
         if (pairedP.has(p)) continue;
@@ -335,7 +336,7 @@ export function unifiedText(results: CompareIdResult[], warnings: string[]): str
         match: 'זהה במלואו',
         mismatch: 'נמצאו אי-התאמות',
         missing_pdf: 'קיים בנתונים בלבד (חסר PDF)',
-        missing_dat: 'קיים ב-PDF בלבד (חסר בנתונים)',
+        missing_data: 'קיים ב-PDF בלבד (חסר בנתונים)',
         error: 'שגיאה בפענוח',
     };
     for (const r of results) {
@@ -348,9 +349,9 @@ export function unifiedText(results: CompareIdResult[], warnings: string[]): str
             const period = `תקופה ${row.startDisplay} - ${row.endDisplay}`;
             if (row.status === ROW_DIFF) {
                 for (const d of row.diffs) {
-                    lines.push(`  - ${period}: ${d.fieldName}: ב-PDF "${d.pdfValue}" מול "${d.datValue}" בנתונים`);
+                    lines.push(`  - ${period}: ${d.fieldName}: ב-PDF "${d.pdfValue}" מול "${d.dataValue}" בנתונים`);
                 }
-            } else if (row.status === ROW_DAT_ONLY) {
+            } else if (row.status === ROW_DATA_ONLY) {
                 lines.push(`  - ${period}: קיימת בנתונים אך לא נמצאה ב-PDF`);
             } else if (row.status === ROW_PDF_ONLY) {
                 lines.push(`  - ${period}: מופיעה ב-PDF אך לא נמצאה בנתונים`);

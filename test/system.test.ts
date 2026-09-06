@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { before, describe, it } from 'node:test';
 
-import { ROW_DAT_ONLY, ROW_DIFF, ROW_MATCH, ROW_PDF_ONLY, compareId } from '../src/comparator';
+import { ROW_DATA_ONLY, ROW_DIFF, ROW_MATCH, ROW_PDF_ONLY, compareId } from '../src/comparator';
 import { parsePdfFile, toLogical, toVisual } from '../src/parsers/pdfChinuchParser';
 import { parseTableRows } from '../src/tableSource';
 import { CompareIdResult } from '../src/compare-types';
@@ -98,14 +98,14 @@ describe('השוואה מלאה על קבצי הדוגמה', () => {
         diff = rows.get('01092012|31082013')!;
         assert.deepEqual(diff.diffs.map((d) => d.fieldName), ['אורך שירות (חודשים)']);
 
-        assert.equal(rows.get('01092013|31082014')!.status, ROW_DAT_ONLY);
+        assert.equal(rows.get('01092013|31082014')!.status, ROW_DATA_ONLY);
         assert.equal(rows.get('01091998|31082000')!.status, ROW_PDF_ONLY);
         assert.equal(rows.get('01092000|31082005')!.status, ROW_MATCH);
     });
 
     it('צדדים חסרים', () => {
         assert.equal(res.get('34567890')!.status, 'missing_pdf');
-        assert.equal(res.get('45678901')!.status, 'missing_dat');
+        assert.equal(res.get('45678901')!.status, 'missing_data');
     });
 
     it('כלל השבתון', () => {
@@ -118,7 +118,7 @@ describe('השוואה מלאה על קבצי הדוגמה', () => {
 // ---------- זיהוי "שורה עם שגיאה" (תקופות כמעט זהות) ----------
 
 describe('זיהוי שורה עם שגיאה', () => {
-    const datPeriod = {
+    const dataPeriod = {
         idNumber: '1',
         sugTkufa: 9999,
         start: '01092010',
@@ -146,7 +146,7 @@ describe('זיהוי שורה עם שגיאה', () => {
     };
 
     it('תאריך סיום שונה - שורה שגויה אחת, לא שתי שורות חד-צדדיות', () => {
-        const r = compareId('1', [datPeriod], pdfResult({ ...pdfPeriod, end: '30082015' }));
+        const r = compareId('1', [dataPeriod], pdfResult({ ...pdfPeriod, end: '30082015' }));
         assert.equal(r.totalCompared, 1);
         assert.equal(r.rows.length, 1);
         assert.equal(r.rows[0].status, ROW_DIFF);
@@ -155,23 +155,23 @@ describe('זיהוי שורה עם שגיאה', () => {
     });
 
     it('תאריך התחלה שונה + היקף שונה - שורה שגויה עם שני פערים', () => {
-        const r = compareId('1', [datPeriod], pdfResult({ ...pdfPeriod, start: '01102010', heikef: 0.5 }));
+        const r = compareId('1', [dataPeriod], pdfResult({ ...pdfPeriod, start: '01102010', heikef: 0.5 }));
         assert.equal(r.rows.length, 1);
         assert.equal(r.rows[0].status, ROW_DIFF);
         assert.deepEqual(r.rows[0].diffs.map((d) => d.fieldName), ['מתאריך', 'היקף משרה']);
     });
 
     it('תקופות שונות באמת (אף תאריך זהה) נשארות חד-צדדיות', () => {
-        const r = compareId('1', [datPeriod], pdfResult({ ...pdfPeriod, start: '01091990', end: '31081995' }));
+        const r = compareId('1', [dataPeriod], pdfResult({ ...pdfPeriod, start: '01091990', end: '31081995' }));
         assert.equal(r.totalCompared, 2);
         const statuses = r.rows.map((row) => row.status).sort();
-        assert.deepEqual(statuses, [ROW_DAT_ONLY, ROW_PDF_ONLY]);
+        assert.deepEqual(statuses, [ROW_DATA_ONLY, ROW_PDF_ONLY]);
     });
 
     it('תאריך אחד זהה אבל כל השאר שונה - לא מצומד', () => {
         const r = compareId(
             '1',
-            [datPeriod],
+            [dataPeriod],
             pdfResult({
                 ...pdfPeriod,
                 end: '31121212',
@@ -183,6 +183,6 @@ describe('זיהוי שורה עם שגיאה', () => {
         );
         assert.equal(r.totalCompared, 2);
         const statuses = r.rows.map((row) => row.status).sort();
-        assert.deepEqual(statuses, [ROW_DAT_ONLY, ROW_PDF_ONLY]);
+        assert.deepEqual(statuses, [ROW_DATA_ONLY, ROW_PDF_ONLY]);
     });
 });

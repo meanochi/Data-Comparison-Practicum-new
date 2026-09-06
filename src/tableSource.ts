@@ -21,7 +21,7 @@
  * כך ששאר המערכת (comparator, ה-API) לא מבחינה מאיזה מקור הגיעו הנתונים.
  */
 import { checkDuplicatePeriods, normalizeId, toInt } from './parsers/datParser';
-import { DatPeriod, ParseResult } from './compare-types';
+import { DataPeriod, ParseResult } from './compare-types';
 
 const RECORD_CODE_9050 = '9050';
 
@@ -79,7 +79,7 @@ export function parseTableRows(rows: unknown): ParseResult {
         }
 
         try {
-            const period: DatPeriod = {
+            const period: DataPeriod = {
                 idNumber: normalizeId(String(row.MISPAR_ZEHUT)),
                 sugTkufa: toInt(String(row.SUG_TKUFA)),
                 start: String(row.TAARICH_ME),

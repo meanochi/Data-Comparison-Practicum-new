@@ -47,7 +47,7 @@ function buildSummary(results: CompareIdResult[]): CompareSummary {
         total: results.length,
         match: results.filter((r) => r.status === 'match').length,
         mismatch: results.filter((r) => r.status === 'mismatch').length,
-        missing: results.filter((r) => r.status === 'missing_pdf' || r.status === 'missing_dat').length,
+        missing: results.filter((r) => r.status === 'missing_pdf' || r.status === 'missing_data').length,
         error: results.filter((r) => r.status === 'error').length,
     };
 }
@@ -62,7 +62,7 @@ function annotateSentRows(rawRows: unknown[], results: CompareIdResult[]): Annot
     const excludedKeys = new Set<string>();
     for (const r of results) {
         for (const row of r.rows) {
-            if (row.datRow) rowIndex.set(`${r.idNumber}|${row.start}|${row.end}`, row);
+            if (row.dataRow) rowIndex.set(`${r.idNumber}|${row.start}|${row.end}`, row);
         }
         for (const ex of r.excluded) excludedKeys.add(`${r.idNumber}|${ex.start}|${ex.end}`);
     }
@@ -82,7 +82,7 @@ function annotateSentRows(rawRows: unknown[], results: CompareIdResult[]): Annot
                 return {
                     ...(raw as object),
                     valid: 0,
-                    reason: resultRow.diffs.map((d) => `${d.fieldName}: במסמך "${d.pdfValue}" מול "${d.datValue}" בנתונים`).join('; '),
+                    reason: resultRow.diffs.map((d) => `${d.fieldName}: במסמך "${d.pdfValue}" מול "${d.dataValue}" בנתונים`).join('; '),
                 };
             }
             return { ...(raw as object), valid: 0, reason: 'לא נמצאה תקופה תואמת במסמך' };
@@ -116,10 +116,10 @@ export default class CompareService {
 
         logger.info(`/api/compare: התקבלו ${rows.length} שורות טבלה ומסמך "${pdf.filename}"`);
 
-        const datResult = parseTableRows(rows);
+        const tableResult = parseTableRows(rows);
 
         // אכיפת מצב אחד-על-אחד: כל קריאה נושאת ת"ז אחת בלבד
-        const idsInRows = Object.keys(datResult.periodsById);
+        const idsInRows = Object.keys(tableResult.periodsById);
         if (idsInRows.length > 1) {
             throw new ApiError(
                 400,
@@ -143,8 +143,8 @@ export default class CompareService {
 
         // השוואה אחד-על-אחד: ת"ז אחת (מה-rows, ואם אין - מה-PDF) מול המסמך היחיד
         const compareIdNumber = idsInRows[0] ?? pdfResult.idNumber ?? '?';
-        const results = [compareId(compareIdNumber, datResult.periodsById[compareIdNumber], pdfResult, pdf.filename)];
-        const warnings = [...datResult.warnings, ...datResult.errors];
+        const results = [compareId(compareIdNumber, tableResult.periodsById[compareIdNumber], pdfResult, pdf.filename)];
+        const warnings = [...tableResult.warnings, ...tableResult.errors];
         const summary = buildSummary(results);
         // אינדיקציית תקינות לפי האפיון: 1 רק כשכל ההשוואות תקינות במלואן
         const valid: 0 | 1 = summary.total > 0 && summary.match === summary.total ? 1 : 0;
