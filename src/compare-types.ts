@@ -84,7 +84,9 @@ export interface CompareIdResult {
     totalCompared: number;
     matched: number;
     rows: CompareRowResult[];
-    excluded: DataRowDict[];
+    // שורות שאינן משתתפות בהשוואה (למשל עזיבה/אין העסקה - קוד 4): יכולות
+    // להגיע מצד הנתונים או מצד ה-PDF, לכן שני הצורות אפשריות כאן.
+    excluded: (DataRowDict | PdfRowDict)[];
     warnings: string[];
     errors: string[];
     percent: number;

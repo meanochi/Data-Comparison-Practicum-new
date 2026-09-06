@@ -170,6 +170,20 @@ function zchuyotCompatible(p: PdfPeriod, d: DataPeriod): boolean {
 }
 
 /**
+ * תקופת עזיבה/אין העסקה (קוד 4) לא תמיד מודפסת ב-PDF - אבל כשהיא כן
+ * מודפסת (למשל בתווית "אין העסקה"), אסור לה להשתתף בהשוואה, בדיוק כמו
+ * תקופת עזיבה מקבילה בנתונים: היא לא אמורה להירשם כ"קיימת ב-PDF בלבד".
+ */
+function isExcludedPdfPeriod(p: PdfPeriod): boolean {
+    const codes = lookupPdfLabel(PDF_TKUFA_LABELS, p.tkufaLabel);
+    if (codes === undefined) return false;
+    for (const code of codes) {
+        if (EXCLUDED_TKUFA_CODES.has(code)) return true;
+    }
+    return false;
+}
+
+/**
  * ניקוד דמיון בין תקופת PDF לתקופת נתונים, לזיהוי "שורה עם שגיאה":
  * תאריכים שווים שוקלים 2 כל אחד, שאר השדות 1 כל אחד (מקסימום 8).
  */
@@ -258,13 +272,19 @@ export function compareId(
         res.status = 'error';
         return finalizeIdResult(res);
     }
+
+    // תקופה מודפסת בתווית עזיבה/אין העסקה (קוד 4) לא משתתפת בהשוואה,
+    // בדיוק כמו תקופת עזיבה מקבילה בנתונים - גם אם היא כן מודפסת בפועל.
+    const pdfActivePeriods = pdfResult.periods.filter((p) => !isExcludedPdfPeriod(p));
+    res.excluded.push(...pdfResult.periods.filter((p) => isExcludedPdfPeriod(p)).map(pdfRowDict));
+
     if (allPeriods.length === 0) {
         res.status = 'missing_data';
-        res.rows = pdfResult.periods.map((p) => rowResult(ROW_PDF_ONLY, p.start, p.end, { pdfRow: pdfRowDict(p) }));
+        res.rows = pdfActivePeriods.map((p) => rowResult(ROW_PDF_ONLY, p.start, p.end, { pdfRow: pdfRowDict(p) }));
         return finalizeIdResult(res);
     }
 
-    const pdfMap = new Map(pdfResult.periods.map((p) => [`${p.start}|${p.end}`, p]));
+    const pdfMap = new Map(pdfActivePeriods.map((p) => [`${p.start}|${p.end}`, p]));
     const matchedKeys = new Set<string>();
     const dataLeft: DataPeriod[] = [];
 
@@ -283,7 +303,7 @@ export function compareId(
         if (diffs.length === 0) res.matched += 1;
         res.rows.push(rowResult(status, d.start, d.end, { diffs, pdfRow: pdfRowDict(p), dataRow: dataRowDict(d) }));
     }
-    const pdfLeft = pdfResult.periods.filter((p) => !matchedKeys.has(`${p.start}|${p.end}`));
+    const pdfLeft = pdfActivePeriods.filter((p) => !matchedKeys.has(`${p.start}|${p.end}`));
 
     // שלב 2: זיהוי "שורה עם שגיאה" - תקופות כמעט זהות שנשארו משני הצדדים
     // מדווחות כשורה שגויה אחת עם פירוט ההבדלים (כולל הפרשי תאריכים),

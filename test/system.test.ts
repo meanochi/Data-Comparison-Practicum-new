@@ -7,7 +7,7 @@ import { before, describe, it } from 'node:test';
 import { ROW_DATA_ONLY, ROW_DIFF, ROW_MATCH, ROW_PDF_ONLY, compareId } from '../src/comparator';
 import { parsePdfFile, toLogical, toVisual } from '../src/parsers/pdfChinuchParser';
 import { parseTableRows } from '../src/tableSource';
-import { CompareIdResult } from '../src/compare-types';
+import { CompareIdResult, DataRowDict } from '../src/compare-types';
 import { SAMPLES, sampleTableRows } from './helpers/sampleData';
 
 // ---------- פענוח בסיסי ----------
@@ -78,7 +78,7 @@ describe('השוואה מלאה על קבצי הדוגמה', () => {
         assert.equal(r.percent, 100.0);
         // שורת העזיבה לא נספרת אלא רק מוצגת לידיעה
         assert.equal(r.excluded.length, 1);
-        assert.equal(r.excluded[0].sugTkufa, 4);
+        assert.equal((r.excluded[0] as DataRowDict).sugTkufa, 4);
     });
 
     it('זיהוי כל אי-ההתאמות המכוונות', () => {
@@ -184,5 +184,21 @@ describe('זיהוי שורה עם שגיאה', () => {
         assert.equal(r.totalCompared, 2);
         const statuses = r.rows.map((row) => row.status).sort();
         assert.deepEqual(statuses, [ROW_DATA_ONLY, ROW_PDF_ONLY]);
+    });
+
+    it('תקופת "אין העסקה" המודפסת ב-PDF ללא מקבילה בנתונים מוחרגת ולא נספרת כפער', () => {
+        const r = compareId('1', [dataPeriod], pdfResult({
+            ...pdfPeriod,
+            start: '01091993',
+            end: '31081994',
+            tkufaLabel: 'אין העסקה',
+            zchuyotLabel: 'אין העסקה',
+        }));
+        // dataPeriod המקורי נשאר חד-צדדי (אין לו PDF תואם) - ה"אין העסקה" לא משתתפת כלל בהשוואה
+        assert.equal(r.totalCompared, 1);
+        assert.equal(r.rows.length, 1);
+        assert.equal(r.rows[0].status, ROW_DATA_ONLY);
+        assert.equal(r.excluded.length, 1);
+        assert.equal((r.excluded[0] as any).start, '01091993');
     });
 });
