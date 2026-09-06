@@ -65,6 +65,7 @@ export const PDF_TKUFA_LABELS: Record<string, Set<number>> = {
     'חל"ת חלקי': new Set([5]),
     "השעיה": new Set([6]),
     "עזיבה": new Set([4]),
+    "אין העסקה": new Set([4]),
 };
 
 // כלל מאושר: "שבתון" בעמודת סוג תקופה ב-PDF תואם ב-DAT
