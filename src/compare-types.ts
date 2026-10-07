@@ -50,6 +50,26 @@ export interface PdfParseResult {
     errors: string[];
 }
 
+/**
+ * שורת "סיכום תקופות עבודה - לפי אורך שירות" כפי שנשמרת ב-DB (טבלת
+ * NETUNEY_TIK_MECHUSHAVIM). אין עמודת "שנים" - היא לא נשמרת בנפרד, רק
+ * נגזרת מהחודשים; ראו WORK_SUMMARY_YEARS_TOLERANCE ב-workSummaryComparator.ts.
+ */
+export interface DbWorkSummaryRow {
+    tkufa_mezaka_sherut: number;
+    chelkiyut_meshuklelet_sherut: number;
+    achuz_kizba_kafuf_chelkiyut: number;
+    achuz_kizb_achry_hagdl_chl_mla: number;
+}
+
+export type WorkSummaryCompareStatus = 'match' | 'mismatch' | 'missing_pdf' | 'error';
+
+export interface WorkSummaryCompareResult {
+    status: WorkSummaryCompareStatus;
+    diffs: FieldDiff[];
+    errors: string[];
+}
+
 export interface FieldDiff {
     fieldName: string;
     pdfValue: string;

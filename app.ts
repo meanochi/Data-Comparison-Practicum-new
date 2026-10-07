@@ -1,5 +1,6 @@
 import { StartApp } from './src/startApp';
 import { CompareController } from './src/components/compare/compare.controller';
+import { CompareSummaryController } from './src/components/compareSummary/compareSummary.controller';
 import { logger } from './src/utils/logger';
 
 process.on('unhandledRejection', (reason) => {
@@ -10,6 +11,6 @@ process.on('uncaughtException', (error) => {
     logger.error(`Uncaught Exception: ${error.message}`);
 });
 
-const startApp = new StartApp([new CompareController()], Number(process.env.PORT) || 3000);
+const startApp = new StartApp([new CompareController(), new CompareSummaryController()], Number(process.env.PORT) || 3000);
 
 startApp.listen();

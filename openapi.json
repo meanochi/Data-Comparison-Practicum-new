@@ -72,6 +72,62 @@
           }
         }
       }
+    },
+    "/api/compare-summary": {
+      "post": {
+        "summary": "השוואת שורת \"סיכום תקופות עבודה - לפי אורך שירות\" (NETUNEY_TIK_MECHUSHAVIM) מול דוח PDF",
+        "description": "משווה שורה אחת מהטבלה NETUNEY_TIK_MECHUSHAVIM (לפי אורך שירות בלבד, לא \"מחוץ לשירות\") מול טבלת \"סיכום תקופות עבודה\" שמודפסת באותו דוח \"סיכום נתוני פרישה\". בנוסף, בודק עצמאית שיחס השנים/חודשים בתוך הדוח עצמו תקין. ניתן לשלוח בשתי צורות שקולות: JSON גולמי (pdf מקודד base64) או multipart/form-data (pdf כקובץ מצורף ממש, row כשדה טקסט עם אובייקט JSON).",
+        "parameters": [
+          {
+            "name": "full",
+            "in": "query",
+            "required": false,
+            "description": "כשהערך '1', מוסיף לתשובה גם status/diffs/errors. ברירת המחדל מחזירה תשובה רזה (valid, text בלבד).",
+            "schema": { "type": "string", "enum": ["1"] }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CompareSummaryRequestJson" },
+              "example": {
+                "row": {
+                  "tkufa_mezaka_sherut": 132,
+                  "chelkiyut_meshuklelet_sherut": 0.822,
+                  "achuz_kizba_kafuf_chelkiyut": 22,
+                  "achuz_kizb_achry_hagdl_chl_mla": 18.084
+                },
+                "pdf": {
+                  "filename": "report_12345678.pdf",
+                  "content": "<PDF בקידוד base64>"
+                }
+              }
+            },
+            "multipart/form-data": {
+              "schema": { "$ref": "#/components/schemas/CompareSummaryRequestForm" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "ההשוואה בוצעה (גם כשהתוצאה אינה תקינה - valid=0 אינו שגיאת HTTP)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CompareSummaryResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "בקשה לא תקינה: row/pdf חסרים, row עם שדה חסר/לא מספרי, או row שאינו JSON תקין (במצב form-data)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -155,6 +211,59 @@
         "type": "object",
         "properties": {
           "error": { "type": "string" }
+        }
+      },
+      "DbWorkSummaryRow": {
+        "type": "object",
+        "description": "שורת NETUNEY_TIK_MECHUSHAVIM (לפי אורך שירות בלבד - אין עמודת \"שנים\", היא נגזרת מהחודשים).",
+        "required": ["tkufa_mezaka_sherut", "chelkiyut_meshuklelet_sherut", "achuz_kizba_kafuf_chelkiyut", "achuz_kizb_achry_hagdl_chl_mla"],
+        "properties": {
+          "tkufa_mezaka_sherut": { "type": "number", "description": "סך חודשים", "example": 132 },
+          "chelkiyut_meshuklelet_sherut": { "type": "number", "description": "חלקיות משוקללת", "example": 0.822 },
+          "achuz_kizba_kafuf_chelkiyut": { "type": "number", "description": "אחוז קצבה כפוף לחלקיות", "example": 22 },
+          "achuz_kizb_achry_hagdl_chl_mla": { "type": "number", "description": "אחוז לפי חלקיות מלאה", "example": 18.084 }
+        }
+      },
+      "CompareSummaryRequestJson": {
+        "type": "object",
+        "required": ["row", "pdf"],
+        "properties": {
+          "row": { "$ref": "#/components/schemas/DbWorkSummaryRow" },
+          "pdf": { "$ref": "#/components/schemas/PdfFile" }
+        }
+      },
+      "CompareSummaryRequestForm": {
+        "type": "object",
+        "required": ["row", "pdf"],
+        "properties": {
+          "row": {
+            "type": "string",
+            "description": "שורת ה-DB, מקודדת כמחרוזת JSON",
+            "example": "{\"tkufa_mezaka_sherut\":132,\"chelkiyut_meshuklelet_sherut\":0.822,\"achuz_kizba_kafuf_chelkiyut\":22,\"achuz_kizb_achry_hagdl_chl_mla\":18.084}"
+          },
+          "pdf": { "type": "string", "format": "binary", "description": "קובץ ה-PDF, מצורף ממש" }
+        }
+      },
+      "CompareSummaryResponse": {
+        "type": "object",
+        "properties": {
+          "valid": { "type": "integer", "enum": [0, 1], "description": "1 רק כשהשורה תואמת במלואה (status=match)" },
+          "text": { "type": "string", "description": "טקסט מאוחד המרכז את התוצאה והפערים" },
+          "status": {
+            "type": "string",
+            "enum": ["match", "mismatch", "missing_pdf", "error"],
+            "description": "מוחזר רק כש-?full=1"
+          },
+          "diffs": {
+            "type": "array",
+            "items": { "type": "object" },
+            "description": "מוחזר רק כש-?full=1 - פירוט השדות שאינם תואמים"
+          },
+          "errors": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "מוחזר רק כש-?full=1"
+          }
         }
       }
     }
