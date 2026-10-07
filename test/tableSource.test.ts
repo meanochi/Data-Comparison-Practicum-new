@@ -137,6 +137,17 @@ describe('POST /api/compare', () => {
         assert.equal(body.results[0].status, 'missing_data');
     });
 
+    it('ת"ז הנתונים שונה מהת"ז שזוהתה בתוך ה-PDF - מדווח כשגיאה', async () => {
+        // rows של ת"ז 23456789 יחד עם ה-PDF של ת"ז 12345678 - פיצול מכוון
+        const [status, body] = await post({ rows: rowsOf('023456789'), pdf: pdfOf('12345678') }, { full: true });
+        assert.equal(status, 200);
+        assert.equal(body.valid, 0);
+        assert.equal(body.summary.error, 1);
+        assert.equal(body.results[0].status, 'error');
+        assert.ok(body.text.includes('23456789'));
+        assert.ok(body.text.includes('12345678'));
+    });
+
     it('תיעוד ה-API זמין ב-/api-docs (Swagger UI)', async () => {
         const resp = await fetch(`${baseUrl}/api-docs/`);
         assert.equal(resp.status, 200);

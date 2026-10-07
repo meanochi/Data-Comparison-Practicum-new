@@ -143,6 +143,15 @@ export default class CompareService {
 
         // השוואה אחד-על-אחד: ת"ז אחת (מה-rows, ואם אין - מה-PDF) מול המסמך היחיד
         const compareIdNumber = idsInRows[0] ?? pdfResult.idNumber ?? '?';
+
+        // בדיקת התאמה בין ת"ז הנתונים (ולכן גם שם הקובץ, שלפיו נשלפו שורות ה-DAT)
+        // לבין הת"ז שזוהתה בפועל בתוך תוכן ה-PDF - חוסר התאמה הוא שגיאה.
+        if (pdfResult.idNumber !== null && pdfResult.idNumber !== compareIdNumber) {
+            pdfResult.errors.push(
+                `מספר הזהות לפיו נשלפו הנתונים (${compareIdNumber}) שונה ממספר הזהות שזוהה בתוך קובץ ה-PDF (${pdfResult.idNumber})`
+            );
+        }
+
         const results = [compareId(compareIdNumber, tableResult.periodsById[compareIdNumber], pdfResult, pdf.filename)];
         const warnings = [...tableResult.warnings, ...tableResult.errors];
         const summary = buildSummary(results);
