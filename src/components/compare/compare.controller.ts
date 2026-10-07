@@ -24,7 +24,8 @@ export class CompareController extends IController {
         try {
             const pdf = this.extractPdfInput(req);
             const rows = this.extractRows(req);
-            const result = await CompareService.compare(rows, pdf);
+            const idNumber = this.extractIdNumber(req);
+            const result = await CompareService.compare(rows, pdf, idNumber);
 
             const response: Record<string, unknown> = {
                 valid: result.valid,
@@ -56,6 +57,16 @@ export class CompareController extends IController {
             }
         }
         return req.body?.rows;
+    }
+
+    /**
+     * idNumber (אופציונלי) - מספר הזהות לפי שם הקובץ בצד השולח (C#), שאינו
+     * בהכרח זהה לת"ז שבשורות ה-rows. כשסופק, נבדק מול הת"ז שתיפענח בפועל
+     * מתוך תוכן ה-PDF - ראו CompareService.compare.
+     */
+    private extractIdNumber(req: Request): string | undefined {
+        const raw = req.body?.idNumber;
+        return typeof raw === 'string' && raw !== '' ? raw : undefined;
     }
 
     /** pdf מגיע כאובייקט JSON (filename + content ב-base64) או כקובץ מצורף ממש (form-data). */

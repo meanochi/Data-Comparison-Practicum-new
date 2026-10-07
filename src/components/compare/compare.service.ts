@@ -109,7 +109,7 @@ function dumpRequest(rows: unknown, pdf: PdfInput): void {
 
 export default class CompareService {
     /** השוואת שורות טבלה מול מסמך PDF, עבור תעודת זהות אחת (אחד-על-אחד). */
-    static async compare(rows: unknown, pdf: PdfInput): Promise<CompareApiResult> {
+    static async compare(rows: unknown, pdf: PdfInput, fileIdNumber?: string): Promise<CompareApiResult> {
         if (!Array.isArray(rows)) {
             throw new ApiError(400, 'נדרש שדה rows: מערך שורות מהטבלה הזמנית');
         }
@@ -141,17 +141,19 @@ export default class CompareService {
             pdfResult = { idNumber: null, periods: [], warnings: [], errors: [`שגיאה בפענוח ${pdf.filename}: ${exc.message}`] };
         }
 
-        // השוואה אחד-על-אחד: ת"ז אחת (מה-rows, ואם אין - מה-PDF) מול המסמך היחיד
-        const compareIdNumber = idsInRows[0] ?? pdfResult.idNumber ?? '?';
-
-        // בדיקת התאמה בין ת"ז הנתונים (ולכן גם שם הקובץ, שלפיו נשלפו שורות ה-DAT)
-        // לבין הת"ז שזוהתה בפועל בתוך תוכן ה-PDF - חוסר התאמה הוא שגיאה.
-        if (pdfResult.idNumber !== null && pdfResult.idNumber !== compareIdNumber) {
-            pdfResult.errors.push(
-                `מספר הזהות לפיו נשלפו הנתונים (${compareIdNumber}) שונה ממספר הזהות שזוהה בתוך קובץ ה-PDF (${pdfResult.idNumber})`
-            );
+        // בדיקה עצמאית: ת"ז לפי שם הקובץ (fileIdNumber, אם נשלח) מול הת"ז שזוהתה
+        // בפועל בתוך תוכן ה-PDF - בלי שום תלות בשורות ה-DAT שנשלחו.
+        if (fileIdNumber !== undefined && pdfResult.idNumber !== null) {
+            const normalizedFileId = normalizeId(fileIdNumber);
+            if (normalizedFileId !== pdfResult.idNumber) {
+                pdfResult.errors.push(
+                    `מספר הזהות משם הקובץ (${normalizedFileId}) שונה ממספר הזהות שזוהה בתוך קובץ ה-PDF (${pdfResult.idNumber})`
+                );
+            }
         }
 
+        // השוואה אחד-על-אחד: ת"ז אחת (מה-rows, ואם אין - מה-PDF) מול המסמך היחיד
+        const compareIdNumber = idsInRows[0] ?? pdfResult.idNumber ?? '?';
         const results = [compareId(compareIdNumber, tableResult.periodsById[compareIdNumber], pdfResult, pdf.filename)];
         const warnings = [...tableResult.warnings, ...tableResult.errors];
         const summary = buildSummary(results);
