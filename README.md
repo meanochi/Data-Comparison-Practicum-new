@@ -73,6 +73,63 @@ Content-Type: application/json
 כשורה שגויה אחת עם פירוט ההבדלים, במקום "קיימת רק בנתונים" + "קיימת רק
 במסמך".
 
+## POST /api/compare-summary
+
+ממשק **נפרד** מ-`/api/compare` (לא קשור אליו, לא תלוי בו): משווה שורה אחת
+מהטבלה `NETUNEY_TIK_MECHUSHAVIM` (**לפי אורך שירות בלבד** - לא "מחוץ
+לשירות") מול הטבלה "סיכום תקופות עבודה" שמודפסת באותו דוח PDF (מעל טבלת
+"פירוט תקופות עבודה"). בנוסף, בודק באופן עצמאי שבתוך הדוח עצמו "מספר
+שנים" עקבי עם "מספר חודשים" (לא מול ה-DB - עמודת שנים לא נשמרת שם).
+
+```
+POST /api/compare-summary
+Content-Type: application/json
+
+{
+  "row": {
+    "tkufa_mezaka_sherut": 132,
+    "chelkiyut_meshuklelet_sherut": 0.822,
+    "achuz_kizba_kafuf_chelkiyut": 22,
+    "achuz_kizb_achry_hagdl_chl_mla": 18.084
+  },
+  "pdf": { "filename": "report_12345678.pdf", "content": "<PDF בקידוד base64>" }
+}
+```
+
+- `row` — שורת `NETUNEY_TIK_MECHUSHAVIM` (לפי אורך שירות), כל 4 השדות
+  חובה ומספריים:
+  | שדה | משמעות |
+  |---|---|
+  | `tkufa_mezaka_sherut` | סך חודשים |
+  | `chelkiyut_meshuklelet_sherut` | חלקיות משוקללת |
+  | `achuz_kizba_kafuf_chelkiyut` | אחוז קצבה כפוף לחלקיות |
+  | `achuz_kizb_achry_hagdl_chl_mla` | אחוז לפי חלקיות מלאה |
+- `pdf` — דוח "סיכום נתוני פרישה" של אותה ת"ז, שם + תוכן ב-base64.
+
+אותו חוזה נתמך גם כ-**multipart/form-data**: שדה `row` כטקסט (אובייקט
+JSON) ושדה `pdf` כקובץ מצורף ממש.
+
+מבנה התשובה (ברירת מחדל - רזה):
+
+```json
+{
+  "valid": 1,   // 1 רק כש-4 השדות תואמים במלואם (status=match)
+  "text": "סיכום תקופות עבודה: זהה במלואו"
+}
+```
+
+בקריאה עם `?full=1` נוספים `status` (`match` / `mismatch` / `missing_pdf`
+- לא נמצאה טבלת הסיכום בדוח / `error` - פענוח ה-PDF עצמו נכשל), `diffs`
+(פירוט השדות שלא תואמים) ו-`errors`.
+
+**סבילות:** השוואת 4 השדות מול ה-DB נעשית עם סבילות קטנה (0.001), לא
+התאמה מדויקת ל-100% — כדי שעיגולים זניחים בתצוגת ה-PDF לא ייחשבו אי-התאמה.
+בדיקת יחס השנים/חודשים (בתוך הדוח עצמו) משתמשת בסבילות 0.05 (כי "שנים"
+מוצג מעוגל לעשירית בדוח).
+
+בקשה לא תקינה (`row`/`pdf` חסרים, או שדה ב-`row` חסר/לא מספרי) נדחית עם
+400. תיעוד מלא + "Try it out" זמינים גם ב-`/api-docs`.
+
 ## כללי השוואה שסוכמו
 
 1. **התאמת שורות** לפי (תאריך התחלה, תאריך סיום); לאחר מכן מושווים סוג
@@ -95,18 +152,23 @@ Content-Type: application/json
 ```
 app.ts                              # נקודת כניסה
 IController.ts                      # מחלקת בקר בסיס
-openapi.json                        # מקור תיעוד ה-Swagger של POST /api/compare
+openapi.json                        # מקור תיעוד ה-Swagger - שני ה-endpoints
 src/
   startApp.ts                       # אתחול אפליקציית Express (כולל /api-docs)
-  components/compare/
-    compare.controller.ts           # POST /api/compare
-    compare.service.ts              # הלוגיקה העסקית: פענוח, השוואה, בניית תשובה
-  comparator.ts                     # מנוע ההשוואה
+  components/
+    compare/
+      compare.controller.ts         # POST /api/compare
+      compare.service.ts            # הלוגיקה העסקית: פענוח, השוואה, בניית תשובה
+    compareSummary/
+      compareSummary.controller.ts  # POST /api/compare-summary
+      compareSummary.service.ts     # הלוגיקה העסקית: פענוח, השוואה, בניית תשובה
+  comparator.ts                     # מנוע ההשוואה (תקופות עבודה)
+  workSummaryComparator.ts          # מנוע ההשוואה (סיכום תקופות עבודה)
   mappings.ts                       # טבלאות קודים ומיפוי PDF -> DAT
-  tableSource.ts                    # פענוח שורות JSON מהטבלה הזמנית - מקור הנתונים היחיד של ה-API
+  tableSource.ts                    # פענוח שורות JSON מהטבלה הזמנית - מקור הנתונים היחיד של /api/compare
   parsers/
     datParser.ts                    # עזרים משותפים (נרמול ת"ז, תאריך, בדיקת כפילויות)
-    pdfChinuchParser.ts             # פרסר דו"ח "סיכום נתוני פרישה"
+    pdfChinuchParser.ts             # פרסר דו"ח "סיכום נתוני פרישה" (תקופות + סיכום)
   pdfText.ts                        # חילוץ טקסט גנרי מ-PDF (mupdf)
   middleware/                       # headers, error handling
   utils/                            # config, logger
