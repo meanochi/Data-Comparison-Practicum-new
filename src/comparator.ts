@@ -91,7 +91,7 @@ function compareRow(pdfRow: PdfPeriod, dataRow: DataPeriod, warnings: string[]):
         if (!ok) {
             diffs.push({
                 fieldName: 'סוג תקופה',
-                pdfValue: `${SABBATICAL_TKUFA_CODE} (שבתון) + זכויות ${SABBATICAL_ZCHUYOT_CODE}`,
+                pdfValue: 'שבתון',
                 dataValue: `${dataRow.sugTkufa} (${SUG_TKUFA[dataRow.sugTkufa] ?? 'לא מוכר'}) + זכויות ${dataRow.sugZchuyot}`,
             });
         }
@@ -110,7 +110,7 @@ function compareRow(pdfRow: PdfPeriod, dataRow: DataPeriod, warnings: string[]):
         } else if (!allowed.has(dataRow.sugTkufa)) {
             diffs.push({
                 fieldName: 'סוג תקופה',
-                pdfValue: `${[...allowed].join('/')} (${pdfRow.tkufaLabel})`,
+                pdfValue: pdfRow.tkufaLabel,
                 dataValue: `${dataRow.sugTkufa} (${SUG_TKUFA[dataRow.sugTkufa] ?? 'לא מוכר'})`,
             });
         }
@@ -140,7 +140,7 @@ function compareRow(pdfRow: PdfPeriod, dataRow: DataPeriod, warnings: string[]):
     } else if (!allowedZ.has(dataRow.sugZchuyot)) {
         diffs.push({
             fieldName: 'סוג זכויות',
-            pdfValue: `${[...allowedZ].join('/')} (${pdfRow.zchuyotLabel})`,
+            pdfValue: pdfRow.zchuyotLabel,
             dataValue: `${dataRow.sugZchuyot} (${SUG_ZCHUYOT[dataRow.sugZchuyot] ?? 'לא מוכר'})`,
         });
     }
