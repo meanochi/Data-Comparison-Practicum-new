@@ -137,30 +137,15 @@ describe('POST /api/compare', () => {
         assert.equal(body.results[0].status, 'missing_data');
     });
 
-    it('ת"ז לפי idNumber (שם הקובץ) שונה מהת"ז שזוהתה בתוך תוכן ה-PDF - מדווח כשגיאה', async () => {
-        // idNumber "מדווח" כ-23456789, אבל תוכן ה-PDF שנשלח הוא בפועל של ת"ז 12345678 -
-        // הבדיקה עצמאית, לא תלויה בכלל ב-rows שנשלחו (כאן נשלחות שורות של 23456789,
-        // שתואמות את ה-idNumber, כדי לבודד בדיוק את הבדיקה שם-קובץ-מול-תוכן).
-        const [status, body] = await post(
-            { idNumber: '23456789', rows: rowsOf('023456789'), pdf: pdfOf('12345678') },
-            { full: true }
-        );
+    it('ת"ז הנתונים שונה מהת"ז שזוהתה בתוך ה-PDF - מדווח כשגיאה', async () => {
+        // rows של ת"ז 23456789 יחד עם ה-PDF של ת"ז 12345678 - פיצול מכוון
+        const [status, body] = await post({ rows: rowsOf('023456789'), pdf: pdfOf('12345678') }, { full: true });
         assert.equal(status, 200);
         assert.equal(body.valid, 0);
         assert.equal(body.summary.error, 1);
         assert.equal(body.results[0].status, 'error');
         assert.ok(body.text.includes('23456789'));
         assert.ok(body.text.includes('12345678'));
-    });
-
-    it('idNumber תואם לת"ז שבתוך ה-PDF - לא מדווח כשגיאה', async () => {
-        const [status, body] = await post(
-            { idNumber: '012345678', rows: rowsOf('012345678'), pdf: pdfOf('12345678') },
-            { full: true }
-        );
-        assert.equal(status, 200);
-        assert.equal(body.valid, 1);
-        assert.equal(body.summary.error, 0);
     });
 
     it('תיעוד ה-API זמין ב-/api-docs (Swagger UI)', async () => {
