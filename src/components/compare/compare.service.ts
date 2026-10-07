@@ -138,7 +138,7 @@ export default class CompareService {
             }
             pdfResult = await parsePdfBuffer(pdf.buffer);
         } catch (exc: any) {
-            pdfResult = { idNumber: null, periods: [], warnings: [], errors: [`שגיאה בפענוח ${pdf.filename}: ${exc.message}`] };
+            pdfResult = { idNumber: null, periods: [], workSummary: [], warnings: [], errors: [`שגיאה בפענוח ${pdf.filename}: ${exc.message}`] };
         }
 
         // השוואה אחד-על-אחד: ת"ז אחת (מה-rows, ואם אין - מה-PDF) מול המסמך היחיד

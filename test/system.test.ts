@@ -5,7 +5,7 @@ import path from 'node:path';
 import { before, describe, it } from 'node:test';
 
 import { ROW_DATA_ONLY, ROW_DIFF, ROW_MATCH, ROW_PDF_ONLY, compareId } from '../src/comparator';
-import { parsePdfFile, toLogical, toVisual } from '../src/parsers/pdfChinuchParser';
+import { parsePdfFile, parseSummaryRow, toLogical, toVisual } from '../src/parsers/pdfChinuchParser';
 import { parseTableRows } from '../src/tableSource';
 import { CompareIdResult, DataRowDict } from '../src/compare-types';
 import { SAMPLES, sampleTableRows } from './helpers/sampleData';
@@ -19,6 +19,41 @@ describe('היפוך חזותי/לוגי', () => {
         }
         // ספרות נשארות בסדר לוגי בצורה החזותית
         assert.ok(toVisual('פחות מ-1/3').startsWith('1/3'));
+    });
+});
+
+describe('שורת "סיכום תקופות עבודה"', () => {
+    it('שורה מלאה (5 שדות) - לפי אורך שירות', () => {
+        const line = `9.123 45 0.5 60 5.0 ${toVisual('לפי אורך שירות')}`;
+        const row = parseSummaryRow(line);
+        assert.ok(row);
+        assert.equal(row!.kind, 'service');
+        assert.equal(row!.percentOfFullFraction, 9.123);
+        assert.equal(row!.pensionPercentSubjectToFraction, 45);
+        assert.equal(row!.weightedFraction, 0.5);
+        assert.equal(row!.months, 60);
+        assert.equal(row!.years, 5.0);
+    });
+
+    it('שורה חלקית (2 שדות בלבד, כמו "מחוץ לשירות" בדוח אמיתי) - שאר השדות null', () => {
+        const line = `3 2.5 ${toVisual('מחוץ לשירות')}`;
+        const row = parseSummaryRow(line);
+        assert.ok(row);
+        assert.equal(row!.kind, 'outside');
+        assert.equal(row!.months, 3);
+        assert.equal(row!.years, 2.5);
+        assert.equal(row!.weightedFraction, null);
+        assert.equal(row!.pensionPercentSubjectToFraction, null);
+        assert.equal(row!.percentOfFullFraction, null);
+    });
+
+    it('שורה שלא מסתיימת באחת התוויות הידועות - לא מזוהה כשורת סיכום', () => {
+        assert.equal(parseSummaryRow('1 2 3 משהו אחר'), null);
+    });
+
+    it('קובץ הדוגמה הקיים (בלי טבלת סיכום) לא מייצר שורות סיכום', async () => {
+        const pres = await parsePdfFile(path.join(SAMPLES, 'sample_12345678.pdf'));
+        assert.deepEqual(pres.workSummary, []);
     });
 });
 
@@ -131,6 +166,7 @@ describe('זיהוי שורה עם שגיאה', () => {
     const pdfResult = (period: any) => ({
         idNumber: '1',
         periods: [period],
+        workSummary: [],
         warnings: [],
         errors: [],
     });

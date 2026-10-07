@@ -7,7 +7,7 @@
  */
 import fs from 'node:fs';
 import { extractVisualLines, normalizeDashes, toLogical, toVisual } from '../pdfText';
-import { PdfParseResult, PdfPeriod } from '../compare-types';
+import { PdfParseResult, PdfPeriod, PdfWorkSummaryRow } from '../compare-types';
 
 // ייצוא חוזר לנוחות הצרכנים (בדיקות, פרסרים עתידיים)
 export { toLogical, toVisual, normalizeDashes };
@@ -29,9 +29,47 @@ const ROW_RE = new RegExp(
 // "מספר זהות: 12345678" - בטקסט החזותי התווית הפוכה והמספר לפניה
 const ID_RE = new RegExp('(\\d{5,9})\\s*:' + escapeRegExp(toVisual('מספר זהות')));
 
+// שורת "סיכום תקופות עבודה": עד 5 שדות
+// מספריים (בסדר חזותי, משמאל לימין) ואז תווית השורה - "לפי אורך שירות" /
+// "מחוץ לשירות". בשורת "מחוץ לשירות" רק 2 השדות האחרונים (חודשים, שנים)
+// מאוכלסים בדוח - העמודות החסרות הן תמיד מתחילת הרשימה (האחוזים/החלקיות),
+// לא מהסוף, ולכן ממפים N שדות נוכחים לעמודות N האחרונות מתוך 5.
+const SUMMARY_ROW_SLOTS = ['percentOfFullFraction', 'pensionPercentSubjectToFraction', 'weightedFraction', 'months', 'years'] as const;
+const SUMMARY_ROW_LABELS: Record<string, PdfWorkSummaryRow['kind']> = {
+    [toVisual('לפי אורך שירות')]: 'service',
+    [toVisual('מחוץ לשירות')]: 'outside',
+};
+
+export function parseSummaryRow(line: string): PdfWorkSummaryRow | null {
+    for (const [visualLabel, kind] of Object.entries(SUMMARY_ROW_LABELS)) {
+        if (!line.endsWith(visualLabel)) continue;
+        const numsPart = line.slice(0, line.length - visualLabel.length).trim();
+        const tokens = numsPart === '' ? [] : numsPart.split(/\s+/);
+        if (tokens.length > SUMMARY_ROW_SLOTS.length) return null;
+        const present = SUMMARY_ROW_SLOTS.slice(SUMMARY_ROW_SLOTS.length - tokens.length);
+        const values: Partial<Record<(typeof SUMMARY_ROW_SLOTS)[number], number>> = {};
+        let allFinite = true;
+        tokens.forEach((t, i) => {
+            const n = parseFloat(t);
+            if (!Number.isFinite(n)) allFinite = false;
+            values[present[i]] = n;
+        });
+        if (!allFinite) return null;
+        return {
+            kind,
+            years: values.years ?? null,
+            months: values.months ?? null,
+            weightedFraction: values.weightedFraction ?? null,
+            pensionPercentSubjectToFraction: values.pensionPercentSubjectToFraction ?? null,
+            percentOfFullFraction: values.percentOfFullFraction ?? null,
+        };
+    }
+    return null;
+}
+
 /** פענוח PDF מתוך Buffer. */
 export async function parsePdfBuffer(buf: Buffer): Promise<PdfParseResult> {
-    const result: PdfParseResult = { idNumber: null, periods: [], warnings: [], errors: [] };
+    const result: PdfParseResult = { idNumber: null, periods: [], workSummary: [], warnings: [], errors: [] };
     let extracted;
     try {
         extracted = await extractVisualLines(buf);
@@ -68,6 +106,13 @@ function parsePageLines(lines: string[], pageNo: number, result: PdfParseResult)
                 result.idNumber = m[1].replace(/^0+/, '');
             }
         }
+
+        const summaryRow = parseSummaryRow(line);
+        if (summaryRow) {
+            result.workSummary.push(summaryRow);
+            continue;
+        }
+
         const m = ROW_RE.exec(line);
         if (!m) continue;
         const [, mekadem, heikef, zchuyotVis, months, end, start, tkufaVis] = m;

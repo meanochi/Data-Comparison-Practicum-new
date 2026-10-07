@@ -28,9 +28,24 @@ export interface PdfPeriod {
     page: number;
 }
 
+/**
+ * שורת "סיכום תקופות עבודה" מהדוח (שתי שורות קבועות: "לפי אורך שירות"
+ * ו"מחוץ לשירות"). בשורת "מחוץ לשירות" רק years/months מאוכלסים בדרך
+ * כלל בדוח - שאר העמודות null.
+ */
+export interface PdfWorkSummaryRow {
+    kind: 'service' | 'outside';
+    years: number | null;
+    months: number | null;
+    weightedFraction: number | null;
+    pensionPercentSubjectToFraction: number | null;
+    percentOfFullFraction: number | null;
+}
+
 export interface PdfParseResult {
     idNumber: string | null;
     periods: PdfPeriod[];
+    workSummary: PdfWorkSummaryRow[];
     warnings: string[];
     errors: string[];
 }
